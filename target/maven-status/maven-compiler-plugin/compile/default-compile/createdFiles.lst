@@ -1,0 +1,4 @@
+io/jettra/fs/grpc/JettraTransferService.class
+io/jettra/fs/grpc/JettraChunk.class
+io/jettra/fs/chunks/ChunkManager.class
+io/jettra/fs/grpc/TransferStatus.class
