@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "io.jettra.fs.grpc";
+option java_outer_classname = "JettraTransferProto";
+
+package io.jettra.fs;
+
+// Servicio para la transferencia de archivos optimizada mediante JettraChunks
+service JettraTransferService {
+  rpc SendChunk(JettraChunk) returns (TransferStatus);
+}
+
+// Mensaje que representa un trozo comprimido de un archivo grande
+message JettraChunk {
+  string fileId = 1;         // Identificador único de la transferencia
+  string fileName = 2;       // Nombre del archivo original
+  int32 chunkIndex = 3;      // Índice del trozo actual
+  int32 totalChunks = 4;     // Cantidad total de trozos
+  bytes data = 5;            // Datos del trozo comprimido
+  int64 fileSize = 6;        // Tamaño total del archivo original
+  string checksum = 7;       // Hash para verificar integridad
+  bool isCompressed = 8;     // Indica si el trozo está comprimido
+}
+
+// Estado de la transferencia del trozo
+message TransferStatus {
+  bool success = 1;
+  string message = 2;
+  int32 receivedChunks = 3;
+}
