@@ -33,6 +33,41 @@ public class JettraChunk {
     public boolean getIsCompressed() { return isCompressed; }
     public JettraChunk setIsCompressed(boolean isCompressed) { this.isCompressed = isCompressed; return this; }
 
+    public byte[] toByteArray() throws java.io.IOException {
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream dos = new java.io.DataOutputStream(baos);
+        dos.writeUTF(fileId != null ? fileId : "");
+        dos.writeUTF(fileName != null ? fileName : "");
+        dos.writeLong(fileSize);
+        dos.writeInt(totalChunks);
+        dos.writeInt(chunkIndex);
+        dos.writeBoolean(isCompressed);
+        if (data != null) {
+            dos.writeInt(data.length);
+            dos.write(data);
+        } else {
+            dos.writeInt(0);
+        }
+        return baos.toByteArray();
+    }
+
+    public static JettraChunk fromByteArray(byte[] bytes) throws java.io.IOException {
+        java.io.DataInputStream dis = new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes));
+        JettraChunk chunk = new JettraChunk();
+        chunk.fileId = dis.readUTF();
+        chunk.fileName = dis.readUTF();
+        chunk.fileSize = dis.readLong();
+        chunk.totalChunks = dis.readInt();
+        chunk.chunkIndex = dis.readInt();
+        chunk.isCompressed = dis.readBoolean();
+        int dataLen = dis.readInt();
+        if (dataLen > 0) {
+            chunk.data = new byte[dataLen];
+            dis.readFully(chunk.data);
+        }
+        return chunk;
+    }
+
     public static JettraChunk newBuilder() { return new JettraChunk(); }
     public JettraChunk build() { return this; }
 }
