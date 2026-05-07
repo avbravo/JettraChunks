@@ -1,12 +1,13 @@
 package io.jettra.fs.chunks;
 
 import java.io.*;
+import java.nio.channels.FileChannel;
 import java.nio.file.*;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.GZIPInputStream;
 
 public class ChunkManager {
-    public static final int CHUNK_SIZE = (int) (1.5 * 1024 * 1024); // 1.5MB por trozo
+    public static final int CHUNK_SIZE = 2 * 1024 * 1024; // 2MB por trozo para máximo balance
 
     public static byte[] compress(byte[] data) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -29,7 +30,6 @@ public class ChunkManager {
         }
     }
 
-    // Método para obtener el número total de trozos de un archivo
     public static int calculateTotalChunks(long fileSize) {
         return (int) Math.ceil((double) fileSize / CHUNK_SIZE);
     }
@@ -38,28 +38,37 @@ public class ChunkManager {
         if (!destDir.exists()) destDir.mkdirs();
         long size = src.length();
         int chunks = calculateTotalChunks(size);
-        try (RandomAccessFile raf = new RandomAccessFile(src, "r")) {
+        
+        try (FileChannel srcChannel = new FileInputStream(src).getChannel();
+             java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < chunks; i++) {
-                long pos = (long) i * CHUNK_SIZE;
-                int len = (int) Math.min(CHUNK_SIZE, size - pos);
-                byte[] buffer = new byte[len];
-                raf.seek(pos);
-                raf.readFully(buffer);
-                File chunkFile = new File(destDir, "chunk_" + i + ".jtra");
-                try (FileOutputStream fos = new FileOutputStream(chunkFile)) {
-                    fos.write(buffer);
-                }
+                final int idx = i;
+                executor.submit(() -> {
+                    long pos = (long) idx * CHUNK_SIZE;
+                    long len = Math.min(CHUNK_SIZE, size - pos);
+                    File chunkFile = new File(destDir, "chunk_" + idx + ".jtra");
+                    try (FileChannel destChannel = new FileOutputStream(chunkFile).getChannel()) {
+                        srcChannel.transferTo(pos, len, destChannel);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
             }
         }
     }
 
     public static void mergeFiles(File dest, File srcDir, int totalChunks) throws IOException {
         if (dest.getParentFile() != null) dest.getParentFile().mkdirs();
-        try (FileOutputStream fos = new FileOutputStream(dest)) {
+        try (FileChannel destChannel = new FileOutputStream(dest).getChannel()) {
+            long pos = 0;
             for (int i = 0; i < totalChunks; i++) {
                 File chunkFile = new File(srcDir, "chunk_" + i + ".jtra");
                 if (!chunkFile.exists()) throw new FileNotFoundException("Falta trozo: " + chunkFile.getName());
-                Files.copy(chunkFile.toPath(), fos);
+                try (FileChannel srcChannel = new FileInputStream(chunkFile).getChannel()) {
+                    long size = srcChannel.size();
+                    destChannel.transferFrom(srcChannel, pos, size);
+                    pos += size;
+                }
             }
         }
     }
