@@ -3,27 +3,31 @@ package io.jettra.fs.chunks;
 import java.io.*;
 import java.nio.channels.FileChannel;
 import java.nio.file.*;
-import java.util.zip.GZIPOutputStream;
-import java.util.zip.GZIPInputStream;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
 public class ChunkManager {
     public static final int CHUNK_SIZE = 2 * 1024 * 1024; // 2MB por trozo para máximo balance
 
     public static byte[] compress(byte[] data) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (GZIPOutputStream gzos = new GZIPOutputStream(baos)) {
-            gzos.write(data);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(data.length);
+        Deflater deflater = new Deflater(Deflater.BEST_SPEED);
+        try (DeflaterOutputStream dos = new DeflaterOutputStream(baos, deflater, 8192)) {
+            dos.write(data);
         }
         return baos.toByteArray();
     }
 
     public static byte[] decompress(byte[] compressedData) throws IOException {
         ByteArrayInputStream bais = new ByteArrayInputStream(compressedData);
-        try (GZIPInputStream gzis = new GZIPInputStream(bais);
-             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[1024];
+        Inflater inflater = new Inflater();
+        try (InflaterInputStream iis = new InflaterInputStream(bais, inflater, 8192);
+             ByteArrayOutputStream baos = new ByteArrayOutputStream(compressedData.length * 2)) {
+            byte[] buffer = new byte[8192];
             int len;
-            while ((len = gzis.read(buffer)) > 0) {
+            while ((len = iis.read(buffer)) > 0) {
                 baos.write(buffer, 0, len);
             }
             return baos.toByteArray();
