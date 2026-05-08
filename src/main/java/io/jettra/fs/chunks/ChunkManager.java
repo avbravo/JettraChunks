@@ -9,7 +9,7 @@ import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
 public class ChunkManager {
-    public static final int CHUNK_SIZE = 32 * 1024 * 1024; // 32MB por trozo para velocidad sónica
+    public static final int CHUNK_SIZE = 128 * 1024 * 1024; // 128MB por trozo para velocidad orbital
 
     public static byte[] compress(byte[] data) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(data.length);
