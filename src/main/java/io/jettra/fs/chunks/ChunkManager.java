@@ -9,7 +9,7 @@ import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
 public class ChunkManager {
-    public static final int CHUNK_SIZE = 128 * 1024 * 1024; // 128MB por trozo para velocidad orbital
+    public static final int CHUNK_SIZE = 4 * 1024 * 1024; // 4MB para balancear gRPC y I/O
 
     public static byte[] compress(byte[] data) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(data.length);
@@ -27,7 +27,7 @@ public class ChunkManager {
              ByteArrayOutputStream baos = new ByteArrayOutputStream(compressedData.length * 2)) {
             byte[] buffer = new byte[8192];
             int len;
-            while ((len = iis.read(buffer)) > 0) {
+            while ((len = iis.read(buffer)) != -1) {
                 baos.write(buffer, 0, len);
             }
             return baos.toByteArray();
@@ -52,7 +52,10 @@ public class ChunkManager {
                     long len = Math.min(CHUNK_SIZE, size - pos);
                     File chunkFile = new File(destDir, "chunk_" + idx + ".jtra");
                     try (FileChannel destChannel = new FileOutputStream(chunkFile).getChannel()) {
-                        srcChannel.transferTo(pos, len, destChannel);
+                        long transferred = 0;
+                        while (transferred < len) {
+                            transferred += srcChannel.transferTo(pos + transferred, len - transferred, destChannel);
+                        }
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -70,7 +73,10 @@ public class ChunkManager {
                 if (!chunkFile.exists()) throw new FileNotFoundException("Falta trozo: " + chunkFile.getName());
                 try (FileChannel srcChannel = new FileInputStream(chunkFile).getChannel()) {
                     long size = srcChannel.size();
-                    destChannel.transferFrom(srcChannel, pos, size);
+                    long transferred = 0;
+                    while (transferred < size) {
+                        transferred += destChannel.transferFrom(srcChannel, pos + transferred, size - transferred);
+                    }
                     pos += size;
                 }
             }
